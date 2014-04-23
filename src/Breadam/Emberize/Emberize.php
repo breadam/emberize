@@ -66,7 +66,9 @@ class Emberize{
 			$this->prepareModel($mixed);
 			
 		}else if($mixed instanceof Collection){
-			//$this->prepareCollection($mixed);
+			foreach($mixed as $model){
+				$this->prepareModel($model);
+			}
 		}
 		return $this->store;
 	}
@@ -155,12 +157,17 @@ class Emberize{
 			
 		}else{
 			
-			$rootName = self::modelName($this->root);
-			$rootKey = $this->getModelIdentifierValue($this->root);
 			$modelKey = $this->getModelIdentifierValue($model);
 			
-			if($rootName == $modelName && $rootKey == $modelKey){
-				return;
+			if(isset($this->root)){
+			
+				$rootName = self::modelName($this->root);
+				$rootKey = $this->getModelIdentifierValue($this->root);
+				
+				
+				if($rootName == $modelName && $rootKey == $modelKey){
+					return;
+				}
 			}
 			
 			$sideloadName = str_plural($modelName);

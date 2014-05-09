@@ -8,7 +8,7 @@
 
 - [Installation](#Installation)
 - [Configuration](#Configuration)
-- [Usage](#Usage)
+- [Methods](#Methods)
 	
 ### Installation
 
@@ -209,3 +209,27 @@
         )
     
     
+### Methods
+	
+#### Emberize::make([$model|$collection],array $fields = null,$sideload = null)
+	
+	'$fields': will be merged with fields defined in config and with Emberize::fields(...).
+	
+#### Emberize::fields(array $fields)
+	
+	'$fields': will be merged with fields defined in config. 
+	
+	usage: 
+	
+		Emberize::fields(array(
+      "model_name_1" => array(
+				"include" => array("field_name_1","field_name_2",...)
+				"exclude" => array("field_name_1","field_name_2",...)
+       ),
+			"model_name_2" => array(
+				"include" => array("field_name_1","field_name_2",...)
+				"exclude" => array("field_name_1","field_name_2",...)
+      )
+		));
+
+

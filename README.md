@@ -181,8 +181,8 @@
 #### identifier:
         
     array(
-        "key" => string -> model["id"]
-        "value" => string -> model["id"]
+        "key" => string
+        "value" => string
     )
         
 #### models: 

@@ -25,9 +25,9 @@ class Emberize{
 	
 	public function __construct($sideload,$identifier,$models){
 		
-		$this->configSideload = is_null($sideload)?true:$sideload;
-		$this->configIdentifier = $identifier;
-		$this->configModels = is_null($models)?array():$models;
+		$this->configSideload = isset($sideload)?$sideload:true;
+		$this->configIdentifier = isset($identifier)?array():$identifier;
+		$this->configModels = isset($models)?$models:array();
 		
 		foreach($this->configModels as $modelName => $config){
 			

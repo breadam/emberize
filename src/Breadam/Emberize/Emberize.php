@@ -82,7 +82,7 @@ class Emberize{
 	private function prepareModel(Model $model){
 		
 		if(in_array($model,$this->parents)){
-			return false;
+			return;
 		}
 		
 		array_push($this->parents,$model);
@@ -125,8 +125,8 @@ class Emberize{
 				
 				$attributes[$relationName] = $this->getModelIdentifierValue($result);
 				
-				if($this->sideload && $this->prepareModel($result) === false){
-					return false;
+				if($this->sideload){
+					$this->prepareModel($result);
 				}
 				
 			}else if($result instanceof Collection){
@@ -141,9 +141,7 @@ class Emberize{
 				
 				if($this->sideload){				
 					foreach($result as $item){
-						if($this->prepareModel($result) === false){
-							return false;
-						}
+						$this->prepareModel($item);
 					}
 				}
 			}

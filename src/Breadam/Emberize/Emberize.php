@@ -133,9 +133,11 @@ class Emberize{
 				
 				$keys = $this->getCollectionIdentifierValues(str_singular($relationName),$result);
 				
-				if(count($keys)){
-					$attributes[$relationName] = $keys;
+				if(count($keys) === 0){
+					continue;
 				}
+				
+				$attributes[$relationName] = $keys;
 				
 				if($this->sideload){				
 					foreach($result as $item){

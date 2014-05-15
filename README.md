@@ -187,8 +187,6 @@
         
 #### models: 
     
-    
-    
     value:
     
         array(

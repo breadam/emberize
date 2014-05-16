@@ -81,10 +81,12 @@ class Emberize{
 	
 	private function prepareModel(Model $model){
 		
-		if(in_array($model,$this->parents)){
-			return;
+		foreach($this->parents as $parent){
+			if(self::isModelSame($parent,$model)){
+				return;
+			}
 		}
-		
+	
 		array_push($this->parents,$model);
 		
 		$fields = $this->getFields($model);
@@ -306,5 +308,13 @@ class Emberize{
 		
 		return $name;
 	}
-
+	
+	private static function isModelSame(Model $a,Model $b){
+		
+		if(self::modelName($a) != self::modelName($b)){
+			return false;
+		}
+		
+		return $a->id == $b->id;
+	}
 }

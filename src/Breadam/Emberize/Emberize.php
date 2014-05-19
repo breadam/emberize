@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Emberize{
 	
-	private $configSideload;
 	private $configIdentifier;
 	
 	private $configIdentifiers = array();
@@ -25,7 +24,7 @@ class Emberize{
 	
 	public function __construct($sideload,$identifier,$models){
 		
-		$this->configSideload = isset($sideload)?$sideload:true;
+		$this->sideload = isset($sideload)?$sideload:true;
 		$this->configIdentifier = isset($identifier)?array():$identifier;
 		$this->configModels = isset($models)?$models:array();
 		
@@ -44,7 +43,7 @@ class Emberize{
 		self::mergeFields($this->globalFields,$this->configFields);
 	}
 	
-	public function make($mixed,array $fields = array(),$sideload = null){
+	public function make($mixed,$sideload = null,array $fields = array()){
 		
 		$this->makeFields = $this->globalFields;
 		
@@ -52,11 +51,7 @@ class Emberize{
 			self::mergeFields($this->makeFields,$fields);
 		}
 		
-		if(is_null($sideload)){
-			$this->sideload = $this->configSideload;
-		}else{
-			$this->sideload = $sideload;
-		}
+		$this->sideload($sideload);
 		
 		$this->parents = array();
 	
@@ -71,6 +66,13 @@ class Emberize{
 			}
 		}
 		return $this->store;
+	}
+	
+	public function sideload($sideload = null){
+		if(!is_null($sideload)){
+			$this->sideload = $sideload;
+		}
+		return $this->sideload;
 	}
 	
 	public function fields(array $fields){

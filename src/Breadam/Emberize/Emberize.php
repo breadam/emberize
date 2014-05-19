@@ -75,10 +75,13 @@ class Emberize{
 		return $this->sideload;
 	}
 	
-	public function fields(array $fields){
-		$this->globalFields = array();
-		self::mergeFields($this->globalFields,$this->configFields);
-		self::mergeFields($this->globalFields,$fields);
+	public function fields(array $fields,$merge = false){
+		if($merge == false){
+			$this->globalFields = array();
+			self::mergeFields($this->globalFields,$this->configFields);
+		}
+			
+		self::mergeFields($this->globalFields,$fields);		
 	}
 	
 	private function prepareModel(Model $model){

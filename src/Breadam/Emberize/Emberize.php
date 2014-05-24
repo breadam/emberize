@@ -76,13 +76,6 @@ class Emberize{
 		return $this->store;
 	}
 	
-	public function sideload($sideload = null){
-		if(!is_null($sideload)){
-			$this->sideload = $sideload;
-		}
-		return $this->sideload;
-	}
-	
 	public function fields(array $fields,$merge = false){
 		if($merge == false){
 			$this->globalFields = array();

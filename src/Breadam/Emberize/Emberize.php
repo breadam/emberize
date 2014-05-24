@@ -7,28 +7,26 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Emberize{
 	
 	private $configIdentifier;
-	
 	private $configIdentifiers = array();
-	
 	private $configFields = array();
+	private $configModes = array();
+	
+	private $globalModes;
+	private $makeModes;
+	
 	private $globalFields;
 	private $makeFields;
-
-	private $sideload;
 	
 	private $root;
 	private $parents;
 	private $keys;
 	private $store;
 	
-	
-	public function __construct($sideload,$identifier,$models){
+	public function __construct($identifier,$models){
 		
-		$this->sideload = isset($sideload)?$sideload:true;
 		$this->configIdentifier = isset($identifier)?array():$identifier;
-		$this->configModels = isset($models)?$models:array();
 		
-		foreach($this->configModels as $modelName => $config){
+		foreach($models as $modelName => $config){
 			
 			if(isset($config["fields"])){
 				$this->configFields[$modelName] = $config["fields"];
@@ -37,13 +35,20 @@ class Emberize{
 			if(isset($config["identifier"])){
 				$this->configIdentifiers[$modelName] = $config["identifier"];
 			}
+			
+			if(isset($config["modes"])){
+				$this->configModes[$modelName] = $config["modes"];
+			}
 		}
 		
 		$this->globalFields = array();
 		self::mergeFields($this->globalFields,$this->configFields);
+		
+		$this->globalModes = array();
+		self::mergeModes($this->globalModes,$this->configModes);
 	}
 	
-	public function make($mixed,$sideload = null,array $fields = array()){
+	public function make($mixed,array $fields = array()){
 		
 		$this->makeFields = $this->globalFields;
 		
@@ -51,18 +56,21 @@ class Emberize{
 			self::mergeFields($this->makeFields,$fields);
 		}
 		
-		$this->sideload($sideload);
-		
-		$this->parents = array();
+		$this->resetParents();
 	
 		if($mixed instanceof Model){
 			
 			$this->root = $mixed;
-			$this->prepareModel($mixed);
+			$resource = $this->prepareModel($mixed);
+			$this->storeRoot(self::modelName($mixed),$resource);
 			
 		}else if($mixed instanceof Collection){
+		
 			foreach($mixed as $model){
-				$this->prepareModel($model);
+			
+				$resource = $this->prepareModel($model);
+				$this->storeSideload($mixed,$resource);
+				
 			}
 		}
 		return $this->store;
@@ -84,23 +92,27 @@ class Emberize{
 		self::mergeFields($this->globalFields,$fields);		
 	}
 	
+	public function modes(array $modes){
+		self::mergeModes($this->globalModes,$modes);		
+	}
+	
 	private function prepareModel(Model $model){
 		
-		foreach($this->parents as $parent){
-			if(self::isModelSame($parent,$model)){
-				return;
-			}
+		if($this->isParent($model)){
+			return;
 		}
-	
-		array_push($this->parents,$model);
 		
-		$fields = $this->getFields($model);
-		$ret = array();
+		$this->addParent($model);
+		
+		$modelName = self::modelName($model);
+		$fields = $this->getFields($modelName);
 		$attributes = $model->attributesToArray();
+		$resource = array();
 		
 		foreach($fields as $index => $fieldName){
+		
 			if(isset($attributes[$fieldName])){
-				$ret[$fieldName] = $attributes[$fieldName];
+				$resource[$fieldName] = $attributes[$fieldName];
 				unset($fields[$index]);
 			}
 		}
@@ -108,15 +120,18 @@ class Emberize{
 		$identifierKey = $this->getModelIdentifierKey($model);
 		$identifierValue = $this->getModelIdentifierValue($model);
 		
-		$ret[$identifierKey] = $identifierValue;
+		$resource[$identifierKey] = $identifierValue;
 		
-		$this->prepareRelationsFor($model,$fields,$ret);
+		$this->prepareRelationsFor($model,$fields,$resource);
 		
-		$this->storeModel($model,$ret);
-		array_pop($this->parents);
+		$this->removeParent($model);
+		
+		return $resource;
 	}
 	
 	private function prepareRelationsFor(Model $model,$relations,&$attributes){
+		
+		$modelName = self::modelName($model);
 		
 		foreach($relations as $relationName){
 			
@@ -127,72 +142,109 @@ class Emberize{
 			}
 			
 			$result = $relation->getResults();
+			$mode = $this->getMode($modelName,$relationName);
 			
-			if($result instanceof Model){
+			if($mode === "embed"){
 				
-				$attributes[$relationName] = $this->getModelIdentifierValue($result);
-				
-				if($this->sideload){
-					$this->prepareModel($result);
-				}
-				
-			}else if($result instanceof Collection){
-				
-				$keys = $this->getCollectionIdentifierValues(str_singular($relationName),$result);
-				
-				if(count($keys) === 0){
-					continue;
-				}
-				
-				$attributes[$relationName] = $keys;
-				
-				if($this->sideload){				
+				if($result instanceof Model){
+					
+					$resource = $this->prepareModel($result);
+					
+					if(is_null($resource)){
+						return;
+					}
+					
+					$attributes[$relationName] = $resource;
+					
+				}else if($result instanceof Collection){
+					
+					$attributes[$relationName] = array();
+					
 					foreach($result as $item){
-						$this->prepareModel($item);
+						$resource = $this->prepareModel($item);
+					
+						if(is_null($resource)){
+							continue;
+						}
+						
+						$attributes[$relationName][] = $resource;
+					}
+					
+				}
+				
+			}else {
+				
+				if($mode === "link"){
+				
+					if(!isset($attributes["links"])){
+						$attributes["links"] = array();
+					}
+						
+					$attributes["links"][$relationName] = str_plural($modelName)."/".$this->getModelIdentifierValue($model)."/".$relationName;	
+				}
+				
+				if($result instanceof Model){
+				
+					$attributes[$relationName] = $this->getModelIdentifierValue($result);
+					
+					if($mode === "sideload"){
+						
+						$this->storeSideload($result,$this->prepareModel($result));
+						
+					}
+				}else if($result instanceof Collection){
+					
+					$keys = $this->getCollectionIdentifierValues(str_singular($relationName),$result);
+					
+					if(count($keys) === 0){
+						continue;
+					}
+					
+					$attributes[$relationName] = $keys;
+					
+					if($mode === "sideload"){
+						
+						foreach($result as $item){
+							$this->storeSideload($item,$this->prepareModel($item));
+						}
+						
 					}
 				}
 			}
 		}
-		
 	}
 	
-	private function storeModel(Model $model,$fields){
+	private function storeRoot($modelName,$resource){
+		$this->store[$modelName] = $resource;
+	}
+	
+	private function storeSideload(Model $model,$resource){
 		
 		$modelName = self::modelName($model);
 		
-		if($this->root == $model){
+		if(isset($this->root) && self::isModelSame($model,$this->root)){
+			return;
+		}
+			
+		$sideloadName = str_plural($modelName);
+		$modelKey = $this->getModelIdentifierValue($model);
 		
-			$this->store[$modelName] = $fields;
-			
-		}else{
-			
-			$modelKey = $this->getModelIdentifierValue($model);
-			
-			if(isset($this->root)){
-			
-				$rootName = self::modelName($this->root);
-				$rootKey = $this->getModelIdentifierValue($this->root);
-				
-				
-				if($rootName == $modelName && $rootKey == $modelKey){
-					return;
-				}
-			}
-			
-			$sideloadName = str_plural($modelName);
-			
-			if(isset($this->keys[$sideloadName]) && isset($this->keys[$sideloadName][$modelKey])){
-				return;
-			}
-			
-			$this->store[$sideloadName][] = $fields;
-			$this->keys[$sideloadName][$modelKey] = true;
+		if(isset($this->keys[$sideloadName]) && isset($this->keys[$sideloadName][$modelKey])){
+			return;
+		}
+		
+		$this->store[$sideloadName][] = $resource;
+		$this->keys[$sideloadName][$modelKey] = true;
+	}
+	
+	private function getMode($modelName,$relationName){
+		
+		if(isset($this->globalModes[$modelName]) && isset($this->globalModes[$modelName][$relationName])){
+			return $this->globalModes[$modelName][$relationName];
 		}
 	}
 	
-	private function getFields(Model $model){
-		
-		$modelName = self::modelName($model);
+	private function getFields($modelName){
 		
 		if(isset($this->makeFields[$modelName])){
 			return $this->makeFields[$modelName];
@@ -263,6 +315,51 @@ class Emberize{
 		return $collection->modelKeys();
 	}
 	
+	private function resetParents(){
+		$this->parents = array();
+	}
+	
+	private function isParent(Model $model){
+		foreach($this->parents as $parent){
+			if(self::isModelSame($parent,$model)){
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	private function addParent(Model $model){
+		array_push($this->parents,$model);
+	}
+	
+	private function removeParent(){
+		array_pop($this->parents);
+	}
+	
+	private static function mergeModes(array &$result,array $modes){
+		
+		if(count($modes) === 0){
+			return;
+		}
+		
+		foreach($modes as $modelName => $array){
+			
+			$arr = array();
+			
+			if(isset($result[$modelName])){
+				$arr = $result[$modelName];
+			}
+			
+			self::mergeModelModes($arr,$array);
+			
+			$result[$modelName] = $arr;
+		}
+	}
+	
+	private static function mergeModelModes(array &$result,array $modes){
+		$result = array_merge($result,$modes);
+	}
+	
 	private static function mergeFields(array &$result,array $fields){
 		
 		if(count($fields) === 0){
@@ -277,27 +374,27 @@ class Emberize{
 				$arr = $result[$model];
 			}
 			
-			self::includeModelFields($arr,$array);
+			self::mergeModelFields($arr,$array);
 			
 			$result[$model] = $arr;
 		}
 	}
 	
-	private static function includeModelFields(array &$result,array $array){
+	private static function mergeModelFields(array &$result,array $fields){
 		
-		$issetInc = isset($array["include"]);
-		$issetExc = isset($array["exclude"]);
+		$issetInc = isset($fields["include"]);
+		$issetExc = isset($fields["exclude"]);
 		
 		if($issetInc || $issetExc){
 			if($issetInc){
-				$result = array_merge($result,$array["include"]);
+				$result = array_merge($result,$fields["include"]);
 			}
 			if($issetExc){
-				$result = array_diff($result,$array["exclude"]);
+				$result = array_diff($result,$fields["exclude"]);
 			}
 		}else{
 		
-			$result = array_merge($result,$array);
+			$result = array_merge($result,$fields);
 			
 		}
 		
@@ -320,6 +417,7 @@ class Emberize{
 			return false;
 		}
 		
-		return $a->id == $b->id;
+		return $a->getKey() == $b->getKey();
 	}
+
 }

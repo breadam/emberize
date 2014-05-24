@@ -14,7 +14,6 @@ class EmberizeServiceProvider extends ServiceProvider {
 	
     $this->app->bind("emberize", function($app){
 			return new Emberize(
-				$app["config"]->get("emberize::sideload"),
 				$app["config"]->get("emberize::identifier"),
 				$app["config"]->get("emberize::models")
 			);

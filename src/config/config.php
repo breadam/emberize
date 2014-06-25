@@ -2,7 +2,7 @@
 
 return array(
 	
-	"resolver" => "DefaultResourceNameResolver",
+	"resolver" => "Breadam\Emberize\DefaultResourceNameResolver",
 	
 	"mode" => null,
 	

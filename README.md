@@ -1,18 +1,16 @@
-#  ! INCOMPLETE !
+#  Laravel 4 response generator for Ember.
 
-#  Laravel 4 response generator for Ember
+### Emberize in a nutshell	
 
-**feedback appreciated**
+	1. Usage: Emberize::make($model or $collection)
+	2. Sideload,embed,links
+ 	2. (Not Yet)Polymorphic relationships. 
+ 	3. Public keys(GUID, email, username, etc as id)
+ 	4. Change attributes,relationships dynamically(If authorized then include user relationship in json)         
 
-## Contents
-
-- [Installation](#Installation)
-- [Configuration](#Configuration)
-- [Methods](#Methods)
-	
 ### Installation
 
-	1. Add the following to your composer.json "require-dev" array 
+	1. Add the following to your composer.json "require" array 
     	
         "breadam/emberize": "dev-master"
 
@@ -32,62 +30,50 @@
 
 ### Quick Example
 
-    -- database --
+    -- Database --
     
-    table foos 
-        id
-        public_key
-        name
-        bar_id
+    table foos(id,public_key,name,bar_id)
     
-    table bars 
-        id
-        bar_specific_public_key
-        name
+    table bars(id,bar_specific_public_key,name)
         
-    table buses 
-        id
-        name
-        foo_id
+    table buses(id,public_key,name,foo_id)
     
-    -- models --
+    -- Models --
         
         class Foo extends Eloquent{
-            public function bar(){
-                return $this->belongsTo("Bar");
-            }
+
+            public function bar(){ return $this->belongsTo("Bar"); }
             
-            public function buses(){
-                return $this->hasMany("Bus");
-            }
+            public function buses(){ return $this->hasMany("Bus"); }
         }
         
         class Bar extends Eloquent{
-            public function foos(){
-                return $this->hasMany("Foo");
-            }
+            public function foos(){ return $this->hasMany("Foo"); }
         }
         
         class Bus extends Eloquent{
-            public function foo(){
-                return $this->belongsTo("Foo");
-            }
+            public function foo(){ return $this->belongsTo("Foo"); }
         }
         
     -- app/config/packages/breadam/emberize/config.php --
     
     return array(
-        "sideload" => true,
         
+		"mode" => null,
+
         "identifier" => array(
             "key" => "id",
             "value" => "public_key"
         ),
         
-        "models" => array(
+        "resources" => array(
         
             "foo" => array(
-                "fields" => array("name","bar","buses")
+                "fields" => array(
+					"name",
+					"bar:sideload",
+					"buses:"embed"
+				)
             ),
             
             "bar" => array(
@@ -96,23 +82,22 @@
                     "value" => "bar_specific_public_key"
                 ),
                 
-                "fields" => array("name","foos")
-                
-            )
+                "fields" => array(
+					"name",
+					"foos:links"
+				)
+            ),
             
             "bus" => array(
-                
-                "identifier" => array(
-                    "key" => "id"
-                ),
-                
-                "fields" => array("name","foo")
-                
+                "fields" => array(
+					"name",
+					"foo:sideload"
+				)
             )
         )
     )
 
-    -- basic usage  --
+    -- Basic usage  --
         
         Route::get('/', function(){
         
@@ -171,52 +156,66 @@
 
 ### Configuration
         
-#### sideload: 
+#### mode: 
 
-    Sets the default behaviour of Emberize::make(...) when no $sideload argument is passed.    
+    Set default mode. If "null", Emberize will prepare only primary keys of relationships    
 
-    value: [true|false]
-    default: true
+    value: null,sideload,embed,link
+    default: null
     
 #### identifier:
-        
-    array(
-        "key" => string
-        "value" => string
-    )
-        
-#### models: 
     
-    value:
+	If set, Emberize will use "key" as the primary key name and "value" attribute as primary key value. If not set, Emberize will use $model->getKeyName() and $model->getKey()   
     
-        array(
-            "model_name_1" => array(
-                "identifier" => array(
-                    "key" => string, 
-                    "value"=> string
-                ),
-                "fields" => array("field_name_1","field_name_2",...)
-            ),
-            "model_name_2" => array(
-                "identifier" => array(
-                    "key" => string, 
-                    "value"=> string
-                ),
-                "fields" => array("field_name_1","field_name_2",...)
-            )
-        )
+    value: 	
+
+		"identifier" => array(
+        	"key" => string,
+        	"value" => string
+    	)
+
+	default:
+
+		"identifier" => array(
+        	"key" => $model->getKeyName(),
+        	"value" => $model->getKey()
+    	)
+        
+#### resources: 
+
+	"resources" => array(
+		
+		"resource_1" => array(
+			"identifier" => array( "key" => "...","value" => "..."),
+			"fields" => array(
+				"attribute_1",
+				"relationship_1:mode"
+			)
+		),
+		"resource_2" => array(...)
+	)
+
+	// Missing
+
+#### resolver:    
+	
+	// Missing
+
+	value: A class name implementing "Breadam\Emberize\ResourceNameResolverInterface"
+	
+	value: "Breadam\Emberize\DefaultResourceNameResolver"   
     
     
 ### Methods
 	
-#### Emberize::make([$model|$collection],array $fields = null,$sideload = null)
+#### Emberize::make([$model|$collection],array $fields = null)
 	
 	'$fields': will be merged with fields defined in config and with Emberize::fields(...).
 	
-#### Emberize::fields(array $fields)
+#### Emberize::fields(array $fields,$merge = false)
 	
 	'$fields': will be merged with fields defined in config. 
-	
+	 
 	usage: 
 	
 		Emberize::fields(array(
@@ -229,5 +228,4 @@
 				"exclude" => array("field_name_1","field_name_2",...)
       )
 		));
-
 

@@ -2,7 +2,7 @@
     "name": "breadam/emberize",
     "description": "A Laravel package for generating Ember friendly responses",
 		"license": "MIT",
-		"keywords":["laravel","ember","sideload"],
+		"keywords":["laravel","ember","ember-data","sideload","link","embed"],
     "authors": [
         {
             "name": "breadam",

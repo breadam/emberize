@@ -22,28 +22,37 @@ class Emberize{
 	private $keys;
 	private $store;
 	
-	public function __construct($identifier,$models){
+	private $resourceNameResolver;
+	
+	public function __construct($identifier,$resources,$mode,ResourceNameResolverInterface $resourceNameResolver){
 		
 		$this->configIdentifier = isset($identifier)?array():$identifier;
+		$this->configMode = $mode;
+		$this->resourceNameResolver = $resourceNameResolver;
 		
-		foreach($models as $modelName => $config){
+		// extract fields, identifier and modes from models config to separate arrays.. configFields, configIdentifiers, configModes
+		
+		foreach($resources as $resourceName => $config){
 			
 			if(isset($config["fields"])){
-				$this->configFields[$modelName] = $config["fields"];
+			
+				list($names,$modes) = self::parseFields($config["fields"],$this->configMode);
+				
+				$this->configFields[$resourceName] = $names;
+				$this->configModes[$resourceName] = $modes;
 			}
 			
 			if(isset($config["identifier"])){
-				$this->configIdentifiers[$modelName] = $config["identifier"];
-			}
-			
-			if(isset($config["modes"])){
-				$this->configModes[$modelName] = $config["modes"];
+				$this->configIdentifiers[$resourceName] = $config["identifier"];
 			}
 		}
 		
+		// prepare global fields
 		$this->globalFields = array();
 		self::mergeFields($this->globalFields,$this->configFields);
 		
+		
+		// prepare global modes
 		$this->globalModes = array();
 		self::mergeModes($this->globalModes,$this->configModes);
 	}
@@ -62,7 +71,7 @@ class Emberize{
 			
 			$this->root = $mixed;
 			$resource = $this->prepareModel($mixed);
-			$this->storeRoot(self::modelName($mixed),$resource);
+			$this->storeRoot($this->resourceName($mixed),$resource);
 			
 		}else if($mixed instanceof Collection){
 		
@@ -75,30 +84,33 @@ class Emberize{
 		}
 		return $this->store;
 	}
-	
+		
 	public function fields(array $fields,$merge = false){
-		if($merge == false){
+		if($merge == false){ // reset globalFields
+			
 			$this->globalFields = array();
 			self::mergeFields($this->globalFields,$this->configFields);
 		}
 			
-		self::mergeFields($this->globalFields,$fields);		
+		self::mergeFields($this->globalFields,$fields);	// merge fields with globalFields
 	}
 	
 	public function modes(array $modes){
-		self::mergeModes($this->globalModes,$modes);		
+		self::mergeModes($this->globalModes,$modes);
 	}
 	
 	private function prepareModel(Model $model){
 		
-		if($this->isParent($model)){
+		if($this->isParent($model)){ // if model is in parents array then it will get processed. just return. prevent inf loop.
 			return;
 		}
 		
 		$this->addParent($model);
 		
-		$modelName = self::modelName($model);
-		$fields = $this->getFields($modelName);
+		$resourceName = $this->resourceName($model);
+		
+		$fields = $this->getFields($resourceName);
+		
 		$attributes = $model->attributesToArray();
 		$resource = array();
 		
@@ -124,7 +136,7 @@ class Emberize{
 	
 	private function prepareRelationsFor(Model $model,$relations,&$attributes){
 		
-		$modelName = self::modelName($model);
+		$resourceName = $this->resourceName($model);
 		
 		foreach($relations as $relationName){
 			
@@ -135,7 +147,7 @@ class Emberize{
 			}
 			
 			$result = $relation->getResults();
-			$mode = $this->getMode($modelName,$relationName);
+			$mode = $this->getMode($resourceName,$relationName);
 			
 			if($mode === "embed"){
 				
@@ -173,7 +185,7 @@ class Emberize{
 						$attributes["links"] = array();
 					}
 						
-					$attributes["links"][$relationName] = str_plural($modelName)."/".$this->getModelIdentifierValue($model)."/".$relationName;	
+					$attributes["links"][$relationName] = $this->resourceName($model,true)."/".$this->getModelIdentifierValue($model)."/".$relationName;	
 				}
 				
 				if($result instanceof Model){
@@ -207,19 +219,17 @@ class Emberize{
 		}
 	}
 	
-	private function storeRoot($modelName,$resource){
-		$this->store[$modelName] = $resource;
+	private function storeRoot($resourceName,$resource){
+		$this->store[$resourceName] = $resource;
 	}
 	
 	private function storeSideload(Model $model,$resource){
-		
-		$modelName = self::modelName($model);
 		
 		if(isset($this->root) && self::isModelSame($model,$this->root)){
 			return;
 		}
 			
-		$sideloadName = str_plural($modelName);
+		$sideloadName = $this->resourceName($model,true);
 		$modelKey = $this->getModelIdentifierValue($model);
 		
 		if(isset($this->keys[$sideloadName]) && isset($this->keys[$sideloadName][$modelKey])){
@@ -230,29 +240,27 @@ class Emberize{
 		$this->keys[$sideloadName][$modelKey] = true;
 	}
 	
-	private function getMode($modelName,$relationName){
+	private function getMode($resourceName,$relationName){
 		
-		if(isset($this->globalModes[$modelName]) && isset($this->globalModes[$modelName][$relationName])){
-			return $this->globalModes[$modelName][$relationName];
+		if(isset($this->globalModes[$resourceName]) && isset($this->globalModes[$resourceName][$relationName])){
+			return $this->globalModes[$resourceName][$relationName];
 		}
 	}
 	
-	private function getFields($modelName){
-		
-		if(isset($this->makeFields[$modelName])){
-			return $this->makeFields[$modelName];
+	private function getFields($resourceName){
+		if(isset($this->makeFields[$resourceName])){
+			return $this->makeFields[$resourceName];
 		}
-		
 		return array();		
 	}
 	
 	private function getModelIdentifierKey(Model $model){
 		
-		$modelName = self::modelName($model);
+		$resourceName = $this->resourceName($model);
 		
-		if(isset($this->configIdentifiers[$modelName])){
+		if(isset($this->configIdentifiers[$resourceName])){
 			
-			$identifier = $this->configIdentifiers[$modelName];
+			$identifier = $this->configIdentifiers[$resourceName];
 			
 			if(isset($identifier["key"])){
 				return $identifier["key"];
@@ -269,11 +277,11 @@ class Emberize{
 	
 	private function getModelIdentifierValue(Model $model){
 		
-		$modelName = self::modelName($model);
+		$resourceName = $this->resourceName($model);
 		
-		if(isset($this->configIdentifiers[$modelName])){
+		if(isset($this->configIdentifiers[$resourceName])){
 			
-			$identifier = $this->configIdentifiers[$modelName];
+			$identifier = $this->configIdentifiers[$resourceName];
 			
 			if(isset($identifier["value"])){
 				return $model->getAttribute($identifier["value"]);
@@ -289,11 +297,11 @@ class Emberize{
 		return $model->getKey();
 	}
 	
-	private function getCollectionIdentifierValues($modelName,Collection $collection){
+	private function getCollectionIdentifierValues($resourceName,Collection $collection){
 		
-		if(isset($this->configIdentifiers[$modelName])){
+		if(isset($this->configIdentifiers[$resourceName])){
 			
-			$identifier = $this->configIdentifiers[$modelName];
+			$identifier = $this->configIdentifiers[$resourceName];
 			
 			if(isset($identifier["value"])){
 				return $collection->lists($identifier["value"]);
@@ -329,28 +337,54 @@ class Emberize{
 		array_pop($this->parents);
 	}
 	
+	private function resourceName($model,$plural = false){
+	
+		$name = $this->resourceNameResolver->resolve($model);
+		
+		if($plural){
+			$name = str_plural($name);
+		}
+		return $name;
+	}
+	
+	private static function parseFields(array $fields,$default = null){
+		
+		$names = array();
+		$modes = array();
+		
+		foreach($fields as $fieldConfig){
+			$arr = explode(":",$fieldConfig);
+			
+			$name = $arr[0];
+			$names[] = $name;
+			
+			if(count($arr) === 2){
+				$modes[$name] = $arr[1];
+			}else if(!is_null($default)){
+				$modes[$name] = $default;
+			}
+		}
+		
+		return array($names,$modes);
+	}
+	
 	private static function mergeModes(array &$result,array $modes){
 		
 		if(count($modes) === 0){
 			return;
 		}
 		
-		foreach($modes as $modelName => $array){
+		foreach($modes as $resourceName => $array){
 			
 			$arr = array();
 			
-			if(isset($result[$modelName])){
-				$arr = $result[$modelName];
+			if(isset($result[$resourceName])){
+				$arr = $result[$resourceName];
 			}
 			
-			self::mergeModelModes($arr,$array);
-			
-			$result[$modelName] = $arr;
+			$arr = array_merge($arr,$array);
+			$result[$resourceName] = $arr;
 		}
-	}
-	
-	private static function mergeModelModes(array &$result,array $modes){
-		$result = array_merge($result,$modes);
 	}
 	
 	private static function mergeFields(array &$result,array $fields){
@@ -359,17 +393,17 @@ class Emberize{
 			return;
 		}
 		
-		foreach($fields as $model => $array){
+		foreach($fields as $resourceName => $array){
 			
 			$arr = array();
 			
-			if(isset($result[$model])){
-				$arr = $result[$model];
+			if(isset($result[$resourceName])){
+				$arr = $result[$resourceName];
 			}
 			
 			self::mergeModelFields($arr,$array);
 			
-			$result[$model] = $arr;
+			$result[$resourceName] = $arr;
 		}
 	}
 	
@@ -392,25 +426,14 @@ class Emberize{
 		}
 		
 	}
-	
-	private static function modelName(Model $model,$plural = false){
 		
-		$name = strtolower(class_basename($model));
-		
-		if($plural){
-			return str_plural($name);
-		}
-		
-		return $name;
-	}
-	
 	private static function isModelSame(Model $a,Model $b){
 		
-		if(self::modelName($a) != self::modelName($b)){
+		if(class_basename($a) != class_basename($b)){
 			return false;
 		}
 		
 		return $a->getKey() == $b->getKey();
 	}
-
+	
 }

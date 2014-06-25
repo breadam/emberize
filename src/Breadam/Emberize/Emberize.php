@@ -78,7 +78,7 @@ class Emberize{
 			foreach($mixed as $model){
 			
 				$resource = $this->prepareModel($model);
-				$this->storeSideload($mixed,$resource);
+				$this->storeSideload($model,$resource);
 				
 			}
 		}

@@ -185,7 +185,7 @@ class Emberize{
 						$attributes["links"] = array();
 					}
 						
-					$attributes["links"][$relationName] = $this->resourceName($model,true)."/".$this->getModelIdentifierValue($model)."/".$relationName;	
+					$attributes["links"][$relationName] = "/".$this->resourceName($model,true)."/".$this->getModelIdentifierValue($model)."/".$relationName;	
 				}
 				
 				if($result instanceof Model){

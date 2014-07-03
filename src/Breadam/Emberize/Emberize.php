@@ -141,11 +141,12 @@ class Emberize{
 	private function prepareRelationsFor(Model $model,$relations,&$attributes){
 		
 		$resourceName = $this->resourceName($model);
+		$result;
 		
 		foreach($relations as $relationName){
 			
 			$relation = $model->$relationName();
-			$result;
+			
 
 			if(($relation instanceof Collection) || ($relation instanceof Model)){ // custom function
 			
@@ -153,14 +154,18 @@ class Emberize{
 			
 			}else if($relation instanceof Relation){
 				
-				$result = $relation->getResults();
-				
 				if($relation instanceof BelongsTo){
+				
 					unset($attributes[$relation->getForeignKey()]);
+					
 				}else if($relation instanceof morphTo){
+				
 					unset($attributes[$relationName."_type"]);
 					unset($attributes[$relationName."_id"]);
+					
 				}
+				
+				$result = $relation->getResults();
 			}
 			
 			$mode = $this->getMode($resourceName,$relationName);

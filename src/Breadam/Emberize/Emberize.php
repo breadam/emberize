@@ -185,7 +185,7 @@ class Emberize{
 						$attributes["links"] = array();
 					}
 						
-					$attributes["links"][$relationName] = "/service/".str_plural($resourceName)."/".$this->getModelIdentifierValue($model)."/".$relationName;	
+					$attributes["links"][$relationName] = str_plural($resourceName)."/".$this->getModelIdentifierValue($model)."/".$relationName;	
 				}
 				
 				if($result instanceof Model){

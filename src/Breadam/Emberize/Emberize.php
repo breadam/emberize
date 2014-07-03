@@ -2,7 +2,9 @@
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class Emberize{
 	
@@ -10,6 +12,7 @@ class Emberize{
 	private $configIdentifiers = array();
 	private $configFields = array();
 	private $configModes = array();
+	private $configPoly = array();
 	
 	private $globalModes;
 	private $makeModes;
@@ -36,10 +39,11 @@ class Emberize{
 			
 			if(isset($config["fields"])){
 			
-				list($names,$modes) = self::parseFields($config["fields"],$this->configMode);
+				list($names,$modes,$poly) = self::parseFields($config["fields"],$this->configMode);
 				
 				$this->configFields[$resourceName] = $names;
 				$this->configModes[$resourceName] = $modes;
+				$this->configPoly[$resourceName] = $poly;
 			}
 			
 			if(isset($config["identifier"])){
@@ -141,12 +145,24 @@ class Emberize{
 		foreach($relations as $relationName){
 			
 			$relation = $model->$relationName();
+			$result;
+
+			if(($relation instanceof Collection) || ($relation instanceof Model)){ // custom function
 			
-			if($relation instanceof BelongsTo){
-				unset($attributes[$relation->getForeignKey()]);
+				$result = $relation;
+			
+			}else if($relation instanceof Relation){
+				
+				$result = $relation->getResults();
+				
+				if($relation instanceof BelongsTo){
+					unset($attributes[$relation->getForeignKey()]);
+				}else if($relation instanceof morphTo){
+					unset($attributes[$relationName."_type"]);
+					unset($attributes[$relationName."_id"]);
+				}
 			}
 			
-			$result = $relation->getResults();
 			$mode = $this->getMode($resourceName,$relationName);
 			
 			if($mode === "embed"){
@@ -189,23 +205,46 @@ class Emberize{
 				}
 				
 				if($result instanceof Model){
-				
-					$attributes[$relationName] = $this->getModelIdentifierValue($result);
+					
+					if(in_array($this->configPoly[$relationName])){
+						
+						$attributes[$relationName] = array(
+							"type" => strtolower(class_basename($result)),
+							"id" => $this->getModelIdentifierValue($result)
+						);
+						
+					}else{
+						$attributes[$relationName] = $this->getModelIdentifierValue($result);
+					}
 					
 					if($mode === "sideload"){
 						
 						$this->storeSideload($result,$this->prepareModel($result));
 						
 					}
+					
 				}else if($result instanceof Collection){
 					
-					$keys = $this->getCollectionIdentifierValues(str_singular($relationName),$result);
+					if(in_array($this->configPoly[$relationName])){
 					
-					if(count($keys) === 0){
-						continue;
+						$attributes[$relationName] = array();
+						
+						foreach($result as $model){
+							$attributes[$relationName][] = array(
+								"type" => strtolower(class_basename($model)),
+								"id" => $this->getModelIdentifierValue($model)
+							);
+						}
+						
+					}else{
+						$keys = $this->getCollectionIdentifierValues(str_singular($relationName),$result);
+						
+						if(count($keys) === 0){
+							continue;
+						}	
+						
+						$attributes[$relationName] = $keys;
 					}
-					
-					$attributes[$relationName] = $keys;
 					
 					if($mode === "sideload"){
 						
@@ -351,6 +390,7 @@ class Emberize{
 		
 		$names = array();
 		$modes = array();
+		$poly = array();
 		
 		foreach($fields as $fieldConfig){
 			$arr = explode(":",$fieldConfig);
@@ -358,14 +398,18 @@ class Emberize{
 			$name = $arr[0];
 			$names[] = $name;
 			
-			if(count($arr) === 2){
+			if(count($arr) > 1){
 				$modes[$name] = $arr[1];
 			}else if(!is_null($default)){
 				$modes[$name] = $default;
 			}
+			
+			if(count($arr) === 3){
+				$poly[] = $name;
+			}
 		}
 		
-		return array($names,$modes);
+		return array($names,$modes,$poly);
 	}
 	
 	private static function mergeModes(array &$result,array $modes){

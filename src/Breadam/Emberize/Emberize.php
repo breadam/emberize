@@ -143,11 +143,7 @@ class Emberize{
 					unset($resource[$relation->getForeignKey()]);
 				}
 				
-				$field = $model->getRelation($fieldName);
-				
-				if(is_null($field)){
-					$field = $relation->getResults();
-				}
+				$field = $relation->getResults();
 			}
 			
 			$mode = $this->getMode($resourceName,$fieldName);

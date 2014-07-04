@@ -212,7 +212,7 @@ class Emberize{
 				
 				if($result instanceof Model){
 					
-					if(isset($this->configPoly[$resourceName]) && array_search($relationName,$this->configPoly[$resourceName],true)){
+					if(isset($this->configPoly[$resourceName]) && in_array($relationName,$this->configPoly[$resourceName],true)){
 						
 						$attributes[$relationName] = array(
 							"type" => strtolower(class_basename($result)),
@@ -231,7 +231,7 @@ class Emberize{
 					
 				}else if($result instanceof Collection){
 					
-					if(isset($this->configPoly[$resourceName]) && array_search($relationName,$this->configPoly[$resourceName])){
+					if(isset($this->configPoly[$resourceName]) && in_array($relationName,$this->configPoly[$resourceName],true)){
 					
 						$attributes[$relationName] = array();
 						

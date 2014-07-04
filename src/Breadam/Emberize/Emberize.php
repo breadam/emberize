@@ -74,14 +74,14 @@ class Emberize{
 		if($mixed instanceof Model){
 			
 			$this->root = $mixed;
-			$resource = $this->prepareModel($mixed);
+			$resource = $this->prepareResource($mixed);
 			$this->storeRoot($this->resourceName($mixed),$resource);
 			
 		}else if($mixed instanceof Collection){
 		
 			foreach($mixed as $model){
 			
-				$resource = $this->prepareModel($model);
+				$resource = $this->prepareResource($model);
 				$this->storeSideload($model,$resource);
 				
 			}
@@ -101,6 +101,157 @@ class Emberize{
 	
 	public function modes(array $modes){
 		self::mergeModes($this->globalModes,$modes);
+	}
+	
+	private function prepareResource(Model $model){
+	
+		if($this->isParent($model)){ // if model is in parents array then it will get processed. just return. prevent inf loop.
+			return;
+		}
+		
+		$this->addParent($model); // add model to parents array to prevent infinite recursion
+		
+		$resourceName = $this->resourceName($model);
+		
+		$fields = $this->getFields($resourceName);
+		
+		$attributes = $model->attributesToArray();
+		$resource = array();
+		
+		foreach($fields as $index => $fieldName){
+		
+			if(isset($attributes[$fieldName])){
+				$resource[$fieldName] = $attributes[$fieldName];
+				unset($fields[$index]);
+			}
+		}
+		
+		$identifierKey = $this->getModelIdentifierKey($model);
+		$identifierValue = $this->getModelIdentifierValue($model);
+		
+		$resource[$identifierKey] = $identifierValue;
+		
+		foreach($fields as $fieldName){
+			
+			$field = $model->$fieldName();
+			
+			if(!($field instanceof Collection || $field instanceof Model) && $field instanceof Relation){
+				
+				$relation = $field;
+				
+				if($relation instanceof BelongsTo){
+					unset($resource[$relation->getForeignKey()]);
+				}
+				
+				$field = $model->getRelation($fieldName);
+				
+				if(is_null($field)){
+					$field = $relation->getResults();
+				}
+			}
+			
+			$mode = $this->getMode($resourceName,$fieldName);
+			
+			if($mode == "embed"){
+				
+				if($field instanceof Model){
+					
+					$fieldResource = $this->prepareModel($result);
+					
+					if(is_null($fieldResource)){
+						return;
+					}
+					
+					$resource[$fieldName] = $fieldResource;
+					
+				}else if($field instanceof Collection){
+					
+					$resource[$fieldName] = array();
+					
+					foreach($field as $item){
+					
+						$$fieldResource = $this->prepareModel($item);
+					
+						if(is_null($fieldResource)){
+							continue;
+						}
+						
+						$resource[$fieldName][] = $fieldResource;
+					}
+				}
+				
+			}else{
+				
+				if($mode === "link"){
+				
+					if(!isset($resource["links"])){
+						$resource["links"] = array();
+					}
+						
+					$resource["links"][$fieldName] = str_plural($resourceName)."/".$this->getModelIdentifierValue($model)."/".$fieldName;
+					
+				}
+				
+				if($field instanceof Model){
+					
+					if($this->isPolymorphic($resourceName,$fieldName)){
+						
+						$resource[$fieldName] = array(
+							"type" => strtolower(class_basename($field)),
+							"id" => $this->getModelIdentifierValue($field)
+						);
+						
+					}else{
+					
+						$resource[$fieldName] = $this->getModelIdentifierValue($field);
+					}
+					
+					if($mode === "sideload"){
+						
+						$this->storeSideload($field,$this->prepareModel($field));
+					}
+					
+				}else if($field instanceof Collection){
+					
+					if($this->isPolymorphic($resourceName,$fieldName)){
+					
+						$resource[$fieldName] = array();
+						
+						foreach($field as $model){
+							$resource[$fieldName][] = array(
+								"type" => $model->{str_singular($fieldName)."_type"},
+								"id" => $model->{str_singular(fieldName)."_id"}
+							);
+						}
+						
+					}else{
+					
+						$keys = $this->getCollectionIdentifierValues(str_singular($fieldName),$result);
+						
+						if(count($keys) === 0){
+							continue;
+						}	
+						
+						$attributes[$relationName] = $keys;
+					}
+					
+					if($mode === "sideload"){
+						
+						foreach($result as $item){
+							$this->storeSideload($item,$this->prepareModel($item));
+						}
+						
+					}
+				}
+			}
+		}
+		$this->removeParent($model);
+		
+		return $resource;
+	}
+	
+	private function isPolymorphic($resourceName,$fieldName){
+		return isset($this->configPoly[$resourceName]) && in_array($fieldName,$this->configPoly[$resourceName],true);
 	}
 	
 	private function prepareModel(Model $model){
@@ -220,13 +371,13 @@ class Emberize{
 						);
 						
 					}else{
+					
 						$attributes[$relationName] = $this->getModelIdentifierValue($result);
 					}
 					
 					if($mode === "sideload"){
 						
 						$this->storeSideload($result,$this->prepareModel($result));
-						
 					}
 					
 				}else if($result instanceof Collection){

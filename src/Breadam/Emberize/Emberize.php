@@ -170,7 +170,7 @@ class Emberize{
 					
 					foreach($field as $item){
 					
-						$$fieldResource = $this->prepareModel($item);
+						$fieldResource = $this->prepareResource($item);
 					
 						if(is_null($fieldResource)){
 							continue;
@@ -220,7 +220,7 @@ class Emberize{
 						foreach($field as $model){
 							$resource[$fieldName][] = array(
 								"type" => $model->{str_singular($fieldName)."_type"},
-								"id" => $model->{str_singular(fieldName)."_id"}
+								"id" => $model->{str_singular($fieldName)."_id"}
 							);
 						}
 						
@@ -232,13 +232,13 @@ class Emberize{
 							continue;
 						}	
 						
-						$attributes[$relationName] = $keys;
+						$resource[$relationName] = $keys;
 					}
 					
 					if($mode === "sideload"){
 						
 						foreach($result as $item){
-							$this->storeSideload($item,$this->prepareModel($item));
+							$this->storeSideload($item,$this->prepareResource($item));
 						}
 						
 					}

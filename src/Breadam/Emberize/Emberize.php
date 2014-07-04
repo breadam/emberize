@@ -140,7 +140,14 @@ class Emberize{
 				$relation = $field;
 				
 				if($relation instanceof BelongsTo){
+				
 					unset($resource[$relation->getForeignKey()]);
+					
+				}else if($relation instanceof morphTo){
+			
+					unset($resource[$fieldName."_type"]);
+					unset($resource[$fieldName."_id"]);
+				
 				}
 				
 				$field = $relation->getResults();

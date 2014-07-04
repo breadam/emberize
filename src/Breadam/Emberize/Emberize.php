@@ -237,8 +237,8 @@ class Emberize{
 						
 						foreach($result as $model){
 							$attributes[$relationName][] = array(
-								"type" => strtolower(class_basename($model)),
-								"id" => $this->getModelIdentifierValue($model)
+								"type" => $model->str_singular($relationName)."_type",
+								"id" => $model->str_singular($relationName)."_id"
 							);
 						}
 						

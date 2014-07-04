@@ -235,7 +235,7 @@ class Emberize{
 							continue;
 						}	
 						
-						$resource[$relationName] = $keys;
+						$resource[$fieldName] = $keys;
 					}
 					
 					if($mode === "sideload"){
@@ -256,167 +256,6 @@ class Emberize{
 	
 	private function isPolymorphic($resourceName,$fieldName){
 		return isset($this->configPoly[$resourceName]) && in_array($fieldName,$this->configPoly[$resourceName],true);
-	}
-	
-	private function prepareModel(Model $model){
-		
-		if($this->isParent($model)){ // if model is in parents array then it will get processed. just return. prevent inf loop.
-			return;
-		}
-		
-		$this->addParent($model);
-		
-		$resourceName = $this->resourceName($model);
-		
-		$fields = $this->getFields($resourceName);
-		
-		$attributes = $model->attributesToArray();
-		$resource = array();
-		
-		foreach($fields as $index => $fieldName){
-		
-			if(isset($attributes[$fieldName])){
-				$resource[$fieldName] = $attributes[$fieldName];
-				unset($fields[$index]);
-			}
-		}
-		
-		$identifierKey = $this->getModelIdentifierKey($model);
-		$identifierValue = $this->getModelIdentifierValue($model);
-		
-		$resource[$identifierKey] = $identifierValue;
-		
-		$this->prepareRelationsFor($model,$fields,$resource);
-		
-		$this->removeParent($model);
-		
-		return $resource;
-	}
-	
-	private function prepareRelationsFor(Model $model,$relations,&$attributes){
-		
-		$resourceName = $this->resourceName($model);
-		$result = null;
-		
-		foreach($relations as $relationName){
-			
-			$relation = $model->$relationName();
-			
-
-			if(($relation instanceof Collection) || ($relation instanceof Model)){ // custom function
-			
-				$result = $relation;
-			
-			}else{
-			
-				$result = $relation->getResults();
-				
-			}
-			
-			if($relation instanceof BelongsTo){
-			
-				unset($attributes[$relation->getForeignKey()]);
-				
-			}else if($relation instanceof morphTo){
-			
-				unset($attributes[$relationName."_type"]);
-				unset($attributes[$relationName."_id"]);
-				
-			}
-			
-			$mode = $this->getMode($resourceName,$relationName);
-			
-			if($mode === "embed"){
-				
-				if($result instanceof Model){
-					
-					$resource = $this->prepareModel($result);
-					
-					if(is_null($resource)){
-						return;
-					}
-					
-					$attributes[$relationName] = $resource;
-					
-				}else if($result instanceof Collection){
-					
-					$attributes[$relationName] = array();
-					
-					foreach($result as $item){
-						$resource = $this->prepareModel($item);
-					
-						if(is_null($resource)){
-							continue;
-						}
-						
-						$attributes[$relationName][] = $resource;
-					}
-					
-				}
-				
-			}else {
-				
-				if($mode === "link"){
-				
-					if(!isset($attributes["links"])){
-						$attributes["links"] = array();
-					}
-						
-					$attributes["links"][$relationName] = str_plural($resourceName)."/".$this->getModelIdentifierValue($model)."/".$relationName;	
-				}
-				
-				if($result instanceof Model){
-					
-					if(isset($this->configPoly[$resourceName]) && in_array($relationName,$this->configPoly[$resourceName],true)){
-						
-						$attributes[$relationName] = array(
-							"type" => strtolower(class_basename($result)),
-							"id" => $this->getModelIdentifierValue($result)
-						);
-						
-					}else{
-					
-						$attributes[$relationName] = $this->getModelIdentifierValue($result);
-					}
-					
-					if($mode === "sideload"){
-						
-						$this->storeSideload($result,$this->prepareModel($result));
-					}
-					
-				}else if($result instanceof Collection){
-					
-					if(isset($this->configPoly[$resourceName]) && in_array($relationName,$this->configPoly[$resourceName],true)){
-					
-						$attributes[$relationName] = array();
-						
-						foreach($result as $model){
-							$attributes[$relationName][] = array(
-								"type" => $model->{str_singular($relationName)."_type"},
-								"id" => $model->{str_singular($relationName)."_id"}
-							);
-						}
-						
-					}else{
-						$keys = $this->getCollectionIdentifierValues(str_singular($relationName),$result);
-						
-						if(count($keys) === 0){
-							continue;
-						}	
-						
-						$attributes[$relationName] = $keys;
-					}
-					
-					if($mode === "sideload"){
-						
-						foreach($result as $item){
-							$this->storeSideload($item,$this->prepareModel($item));
-						}
-						
-					}
-				}
-			}
-		}
 	}
 	
 	private function storeRoot($resourceName,$resource){
@@ -606,13 +445,13 @@ class Emberize{
 				$arr = $result[$resourceName];
 			}
 			
-			self::mergeModelFields($arr,$array);
+			self::mergeResourceFields($arr,$array);
 			
 			$result[$resourceName] = $arr;
 		}
 	}
 	
-	private static function mergeModelFields(array &$result,array $fields){
+	private static function mergeResourceFields(array &$result,array $fields){
 		
 		$issetInc = isset($fields["include"]);
 		$issetExc = isset($fields["exclude"]);

@@ -164,8 +164,8 @@ class Emberize{
 				
 			}else if($relation instanceof morphTo){
 			
-				unset($attributes[str_singular($relationName)."_type"]);
-				unset($attributes[str_singular($relationName)."_id"]);
+				unset($attributes[$relationName."_type"]);
+				unset($attributes[$relationName."_id"]);
 				
 			}
 			

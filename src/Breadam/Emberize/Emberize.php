@@ -226,7 +226,7 @@ class Emberize{
 						
 					}else{
 					
-						$keys = $this->getCollectionIdentifierValues(str_singular($fieldName),$result);
+						$keys = $this->getCollectionIdentifierValues(str_singular($fieldName),$field);
 						
 						if(count($keys) === 0){
 							continue;
@@ -237,7 +237,7 @@ class Emberize{
 					
 					if($mode === "sideload"){
 						
-						foreach($result as $item){
+						foreach($field as $item){
 							$this->storeSideload($item,$this->prepareResource($item));
 						}
 						
@@ -245,6 +245,7 @@ class Emberize{
 				}
 			}
 		}
+		
 		$this->removeParent($model);
 		
 		return $resource;

@@ -191,7 +191,7 @@ class Emberize{
 						$resource["links"] = array();
 					}
 						
-					$resource["links"][$fieldName] = str_plural($resourceName)."/".$this->getModelIdentifierValue($model)."/".$fieldName;
+					$resource["links"][$fieldName] = /*str_plural($resourceName)."/".$this->getModelIdentifierValue($model)."/".*/$fieldName;
 					
 				}
 				

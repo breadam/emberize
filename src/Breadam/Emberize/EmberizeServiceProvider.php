@@ -20,7 +20,8 @@ class EmberizeServiceProvider extends ServiceProvider {
 				$app["config"]->get("emberize::identifier"),
 				$app["config"]->get("emberize::resources"),
 				$app["config"]->get("emberize::mode"),
-				$app->make("\Breadam\Emberize\ResourceNameResolverInterface")
+				$app->make("\Breadam\Emberize\ResourceNameResolverInterface"),
+				$app["config"]->get("emberize::case")
 			);
 		});
 	}

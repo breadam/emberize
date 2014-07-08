@@ -6,6 +6,8 @@ return array(
 	
 	"mode" => null,
 	
+	"case" => "camel"
+	
 	/*
 	
 	"identifier" => array(

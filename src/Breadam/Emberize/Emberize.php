@@ -13,6 +13,7 @@ class Emberize{
 	private $configFields = array();
 	private $configModes = array();
 	private $configPoly = array();
+	private $configCase = "camel";
 	
 	private $globalModes;
 	private $makeModes;
@@ -27,11 +28,12 @@ class Emberize{
 	
 	private $resourceNameResolver;
 	
-	public function __construct($identifier,$resources,$mode,ResourceNameResolverInterface $resourceNameResolver){
+	public function __construct($identifier,$resources,$mode,ResourceNameResolverInterface $resourceNameResolver,$case){
 		
 		$this->configIdentifier = isset($identifier)?array():$identifier;
 		$this->configMode = $mode;
 		$this->resourceNameResolver = $resourceNameResolver;
+		$this->configCase = $case;
 		
 		// extract fields, identifier and modes from models config to separate arrays.. configFields, configIdentifiers, configModes
 		
@@ -119,9 +121,9 @@ class Emberize{
 		$resource = array();
 		
 		foreach($fields as $index => $fieldName){
-		
+			
 			if(isset($attributes[$fieldName])){
-				$resource[$fieldName] = $attributes[$fieldName];
+				$resource[$this->convertCase($fieldName)] = $attributes[$fieldName];
 				unset($fields[$index]);
 			}
 		}
@@ -134,6 +136,8 @@ class Emberize{
 		foreach($fields as $fieldName){
 			
 			$field = $model->$fieldName();
+			$convertedFieldName = $this->convertCase($fieldName);
+			
 			
 			if(!($field instanceof Collection || $field instanceof Model) && $field instanceof Relation){
 				
@@ -165,11 +169,11 @@ class Emberize{
 						return;
 					}
 					
-					$resource[$fieldName] = $fieldResource;
+					$resource[$convertedFieldName] = $fieldResource;
 					
 				}else if($field instanceof Collection){
 					
-					$resource[$fieldName] = array();
+					$resource[$convertedFieldName] = array();
 					
 					foreach($field as $item){
 					
@@ -179,7 +183,7 @@ class Emberize{
 							continue;
 						}
 						
-						$resource[$fieldName][] = $fieldResource;
+						$resource[$convertedFieldName][] = $fieldResource;
 					}
 				}
 				
@@ -191,7 +195,7 @@ class Emberize{
 						$resource["links"] = array();
 					}
 						
-					$resource["links"][$fieldName] = /*str_plural($resourceName)."/".$this->getModelIdentifierValue($model)."/".*/$fieldName;
+					$resource["links"][$convertedFieldName] = /*str_plural($resourceName)."/".$this->getModelIdentifierValue($model)."/".*/$convertedFieldName;
 					
 				}
 				
@@ -218,7 +222,7 @@ class Emberize{
 					
 					if($this->isPolymorphic($resourceName,$fieldName)){
 					
-						$resource[$fieldName] = array();
+						$resource[$convertedFieldName] = array();
 						
 						foreach($field as $model){
 							$resource[$fieldName][] = array(
@@ -235,7 +239,7 @@ class Emberize{
 							continue;
 						}	
 						
-						$resource[$fieldName] = $keys;
+						$resource[$convertedFieldName] = $keys;
 					}
 					
 					if($mode === "sideload"){
@@ -469,6 +473,15 @@ class Emberize{
 			
 		}
 		
+	}
+		
+	private function convertCase($str){
+		if($this->configCase == "snake"){
+			return snake_case($str);
+		}	else if($this->configCase == "camel"){
+			return camel_case($str);
+		}
+		return $str;
 	}
 		
 	private static function isModelSame(Model $a,Model $b){

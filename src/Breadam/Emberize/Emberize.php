@@ -122,7 +122,7 @@ class Emberize{
 		
 		foreach($fields as $index => $fieldName){
 			
-			if(isset($attributes[$fieldName])){
+			if(array_key_exists($fieldName,$attributes)){
 				$resource[$this->convertCase($fieldName)] = $attributes[$fieldName];
 				unset($fields[$index]);
 			}
